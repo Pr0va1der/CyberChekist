@@ -1,7 +1,5 @@
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
-from vk_api.longpoll import VkEventType
-
 token = '408b25eb64e05c943c7f1e72b436be1521939d42af140179ca4b23b4f0bef3738ed196c343b23c1ec0d6e'
 
 
@@ -29,6 +27,7 @@ def kick_member(user_id, chat_id, messages=None):
     vk.messages.removeChatUser(chat_id=chat_id, member_id=user_id)
 
 
+# Проверка пользователя на ересь в подписках
 def check_user(users, chat_id):
     vk = vk_auth()
     groups = read_file()
@@ -42,6 +41,7 @@ def check_user(users, chat_id):
                 break
 
 
+# Возвращает список новых пользователей, сравнивая пользователей до и после
 def find_differehce(list_1, list_2):
     members_list_1 = []
     members_list_2 = []
