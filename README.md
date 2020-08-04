@@ -1,1 +1,1 @@
-# CiberChekist
+# CyberChekist
