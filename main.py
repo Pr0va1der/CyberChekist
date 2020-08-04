@@ -30,7 +30,7 @@ def kick_member(user_id, chat_id, messages=None):
 
 
 # Проверка пользователя на ересь в подписках
-def check_user(users, chat_id):
+def check_users(users, chat_id):
     vk = vk_auth()
     groups = read_file()
 
@@ -38,13 +38,14 @@ def check_user(users, chat_id):
         for group in groups:
             is_member = vk.groups.isMember(group_id=group, user_id=user)
             if is_member:
-                messages = f'Обнаружена ересь! Еретик нейтрализован'
+                messages = 'Обнаружена ересь! Нейтрализация еретика...'
                 kick_member(user, chat_id, messages)
+                messages = 'Еретик нейтрализован'
                 break
 
 
 # Возвращает список новых пользователей, сравнивая пользователей до и после
-def find_differehce(list_1, list_2):
+def find_difference(list_1, list_2):
     members_list_1 = []
     members_list_2 = []
     for i in list_1:
@@ -101,10 +102,10 @@ def main():
             users_init = vk.messages.getConversationMembers(peer_id=peer_id, group_id=group_id)
             if users_finite and users_init != users_finite:
                 if users_finite['count'] < users_init['count']:
-                    new_user = find_differehce(users_init['items'], users_finite['items'])
-                    check_user(new_user, chat_id)
+                    new_user = find_difference(users_init['items'], users_finite['items'])
+                    check_users(new_user, chat_id)
                 elif users_finite['count'] > users_init['count']:
-                    leave_user = find_differehce(users_finite['items'], users_init['items'])
+                    leave_user = find_difference(users_finite['items'], users_init['items'])
                     for user in leave_user:
                         kick_member(user, chat_id)
             users_finite = vk.messages.getConversationMembers(peer_id=peer_id, group_id=group_id)
@@ -124,9 +125,11 @@ def main():
                         if user['online']:
                             if user['online_info']['is_mobile']:
                                 online_status = 'через телефон\n'
+                                device_status = '📱'
                             else:
                                 online_status = 'через сайт\n'
-                            online_users += f'•[{user["screen_name"]}|{user["first_name"]} {user["last_name"]}] {online_status}'
+                                device_status = '🖥'
+                            online_users += f'•{device_status}[{user["screen_name"]}|{user["first_name"]} {user["last_name"]}] {online_status}'
                     send_vk(online_users, chat_id, is_alert=1)
                 elif event.obj.text.lower().split()[0] == '/монетка':
                     if randint(0, 1):
