@@ -33,15 +33,23 @@ def kick_member(user_id, chat_id, messages=None):
 def check_users(users, chat_id):
     vk = vk_auth()
     groups = read_file()
-
     for user in users:
         for group in groups:
             is_member = vk.groups.isMember(group_id=group, user_id=user)
-            if is_member:
+            if white_list(user):
+                break
+            elif is_member:
                 messages = 'Обнаружена ересь! Нейтрализация еретика...'
                 kick_member(user, chat_id, messages)
                 messages = 'Еретик нейтрализован'
                 break
+
+
+def white_list(user):
+    with open('white_list.txt', 'r', encoding='UTF-8') as file:
+        list = file.read().splitlines()
+        if str(user) in list:
+            return True
 
 
 # Возвращает список новых пользователей, сравнивая пользователей до и после
@@ -54,6 +62,13 @@ def find_difference(list_1, list_2):
         members_list_2.append(i['member_id'])
     difference = list(set(members_list_1) - set(members_list_2))
     return difference
+
+
+def sender_is_admin(list, user_id):
+    for user in list['items']:
+        if user_id == user['member_id'] and 'is_admin' in user:
+            admin = True
+            return admin
 
 
 # can_kick(users_list, event.obj.from_id, user_id, chat_id)
@@ -81,7 +96,19 @@ def can_kick(list, user_id, user_kick, chat_id):
         return False
 
 
+def user_in_list(list, user):
+    flag = False
+    for i in range(len(list['profiles'])):
+        if user == list['profiles'][i]['id']:
+            flag = True
+            break
+        else:
+            flag = False
+    return flag
+
+
 def main():
+    is_kicked = None
     group_id = '197440489'
     vk_session = vk_api.VkApi(token=token)
     vk = vk_session.get_api()
@@ -97,7 +124,6 @@ def main():
         except:
             user_id = event.obj.user_id
             is_chat = False
-
         if is_chat:
             users_init = vk.messages.getConversationMembers(peer_id=peer_id, group_id=group_id)
             if users_finite and users_init != users_finite:
@@ -105,10 +131,12 @@ def main():
                     new_user = find_difference(users_init['items'], users_finite['items'])
                     check_users(new_user, chat_id)
                 elif users_finite['count'] > users_init['count']:
-                    leave_user = find_difference(users_finite['items'], users_init['items'])
-                    for user in leave_user:
-                        kick_member(user, chat_id)
+                    if not is_kicked and not sender_is_admin(users_init, event.obj.from_id):
+                        leave_user = find_difference(users_finite['items'], users_init['items'])
+                        for user in leave_user:
+                            kick_member(user, chat_id)
             users_finite = vk.messages.getConversationMembers(peer_id=peer_id, group_id=group_id)
+            is_kicked = False
 
         if event.type == VkBotEventType.MESSAGE_NEW and event.obj.text:
 
@@ -171,8 +199,14 @@ def main():
                             users_list = vk.messages.getConversationMembers(peer_id=peer_id, group_id=group_id)
                             user_nick = event.obj.text.lower().split()[1].split('/')[3]
                             user_id = vk.utils.resolveScreenName(screen_name=user_nick)['object_id']
-                            if can_kick(users_list, event.obj.from_id, user_id, chat_id):
-                                vk.messages.removeChatUser(chat_id=chat_id, member_id=user_id)
+                            user_in_list(users_list, user_id)
+                            if user_in_list(users_list, user_id):
+                                if can_kick(users_list, event.obj.from_id, user_id, chat_id):
+                                    vk.messages.removeChatUser(chat_id=chat_id, member_id=user_id)
+                                    is_kicked = True
+                            else:
+                                messages = 'Пользователь не участник беседы'
+                                send_vk(messages, chat_id)
                         else:
                             messages = 'Неверная ссылка. Повторите попытку'
                             send_vk(messages, chat_id)
