@@ -38,11 +38,12 @@ def check_users(users, chat_id):
         for group in groups:
             is_member = vk.groups.isMember(group_id=group, user_id=user)
             if white_list(user):
-                break
+                return True
             elif is_member:
                 messages = 'Обнаружена ересь! Нейтрализация еретика...'
                 kick_member(user, chat_id, messages)
                 messages = 'Еретик нейтрализован'
+                send_vk(messages, chat_id)
                 break
 
 
