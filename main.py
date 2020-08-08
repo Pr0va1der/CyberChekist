@@ -73,7 +73,6 @@ def sender_is_admin(list, user_id):
             return admin
 
 
-# can_kick(users_list, event.obj.from_id, user_id, chat_id)
 def can_kick(list, user_id, user_kick, chat_id):
     is_admin = None
     is_kick = None
@@ -219,7 +218,7 @@ def main():
                             send_vk(messages, chat_id)
         except Exception as exception:
             print('Exception: ', exception)
-            sleep(120)
+            sleep(5)
             main()
 
 
