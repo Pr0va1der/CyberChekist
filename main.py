@@ -2,7 +2,6 @@ import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from random import randint
 
-
 token = '408b25eb64e05c943c7f1e72b436be1521939d42af140179ca4b23b4f0bef3738ed196c343b23c1ec0d6e'
 
 
@@ -14,11 +13,12 @@ def vk_auth():
 
 def send_vk(text, chat_id, is_alert=0):
     vk = vk_auth()
-    vk.messages.send(chat_id=chat_id, message=text, random_id=0, disable_mentions=is_alert)
+    vk.messages.send(chat_id=chat_id, message=text, random_id=0, disable_mentions=is_alert,
+                     peer_id=2000000000 + int(chat_id))
 
 
-def read_file():
-    with open('bad_groups.txt', 'r', encoding='UTF-8') as file:
+def read_file(file_name):
+    with open(file_name, 'r', encoding='UTF-8') as file:
         list = file.read().splitlines()
         return list
 
@@ -33,8 +33,8 @@ def kick_member(user_id, chat_id, messages=None):
 # Проверка пользователя на ересь в подписках
 def check_user(user, chat_id):
     vk = vk_auth()
-    groups = read_file()
-    if white_list(user):
+    groups = read_file('bad_groups.txt')
+    if user in read_file('white_list.txt'):
         return False
     for group in groups:
         is_member = vk.groups.isMember(group_id=group, user_id=user)
@@ -46,29 +46,22 @@ def check_user(user, chat_id):
             break
 
 
-def white_list(user):
-    with open('white_list.txt', 'r', encoding='UTF-8') as file:
-        list = file.read().splitlines()
-        if str(user) in list:
-            return True
-
-
-# can_kick(users_list, event.obj.from_id, user_id, chat_id)
 def can_kick(list, user_id, user_kick, chat_id):
     is_admin = None
     is_kick = None
     for user in list['items']:
-        if user_id == user['member_id'] and 'is_admin' in user:
+        member_id = user['member_id']
+        if user_id == member_id and 'is_admin' in user:
             is_admin = True
-        elif user_id == user['member_id'] and not 'is_admin' in user:
+        elif user_id == member_id and not 'is_admin' in user:
             messages = 'Вы не администратор'
             send_vk(messages, chat_id)
 
-        if user_kick == user['member_id'] and 'can_kick' in user:
+        if user_kick == member_id and 'can_kick' in user:
             is_kick = True
-        elif user_kick * (-1) == user['member_id'] and 'can_kick' in user:
+        elif user_kick * (-1) == member_id and 'can_kick' in user:
             is_kick = True
-        elif user_kick == user['member_id'] or user_kick * (-1) == user['member_id']:
+        elif user_kick == member_id or user_kick * (-1) == member_id:
             messages = 'Этого пользователя невозможно исключить'
             send_vk(messages, chat_id)
 
@@ -78,10 +71,10 @@ def can_kick(list, user_id, user_kick, chat_id):
         return False
 
 
-def user_in_list(list, user):
+def user_in_list(user_list, user):
     flag = False
-    for i in range(len(list['profiles'])):
-        if user == list['profiles'][i]['id']:
+    for i in range(len(user_list['profiles'])):
+        if user == user_list['profiles'][i]['id']:
             flag = True
             break
         else:
@@ -95,9 +88,9 @@ def command_help(chat_id):
         send_vk(messages, chat_id)
 
 
-def command_online(list):
+def command_online(peer_id, group_id, chat_id):
     vk = vk_auth()
-    users_list = vk.messages.getConversationMembers(peer_id=list['peer_id'], group_id=list['group_id'])
+    users_list = vk.messages.getConversationMembers(peer_id=peer_id, group_id=group_id)
     online_users = 'Список пользователей в сети:\n'
     for user in users_list['profiles']:
         if user['online']:
@@ -107,8 +100,9 @@ def command_online(list):
             else:
                 online_status = 'через сайт\n'
                 device_status = '🖥'
-            online_users += f'•{device_status}[{user["screen_name"]}|{user["first_name"]} {user["last_name"]}] {online_status}'
-    send_vk(online_users, list['chat_id'], is_alert=1)
+            online_users += f'•{device_status}[{user["screen_name"]}|{user["first_name"]}' \
+                            f' {user["last_name"]}] {online_status}'
+    send_vk(online_users, chat_id, is_alert=1)
 
 
 def command_flip(chat_id):
@@ -118,15 +112,15 @@ def command_flip(chat_id):
         random_flip = 'Решка'
 
     messages = f'Тебе выпало: {random_flip}'
-
     send_vk(messages, chat_id)
 
 
 def command_roll(text, chat_id):
-    if len(text.lower().split()) > 1:
-        if text.lower().split()[1].isdigit():
+    split_text = text.lower().split()
+    if len(split_text) > 1:
+        if split_text[1].isdigit():
             if int(text.lower().split()[1]) < 1000:
-                messages = f'Случайное число: {randint(1, int(text.lower().split()[1]))}'
+                messages = f'Случайное число: {randint(1, int(split_text[1]))}'
                 send_vk(messages, chat_id)
             else:
                 messages = 'Слишком большое число. Повторите попытку'
@@ -139,91 +133,89 @@ def command_roll(text, chat_id):
         send_vk(messages, chat_id)
 
 
-def command_who(list):
+def command_who(peer_id, group_id, chat_id):
     vk = vk_auth()
-    users_list = vk.messages.getConversationMembers(peer_id=list['peer_id'], group_id=list['group_id'])
-    who_number = randint(1, len(users_list['profiles'])) - 1
+    users_list = vk.messages.getConversationMembers(peer_id=peer_id, group_id=group_id)
     users = users_list['profiles']
+    who_number = randint(1, len(users)) - 1
     user = f'[{users[who_number]["screen_name"]}|{users[who_number]["first_name"]} {users[who_number]["last_name"]}]'
     messages = f'Это {user}'
-    send_vk(messages, list['chat_id'], is_alert=1)
+    send_vk(messages, chat_id, is_alert=1)
 
 
-def command_kick(text, list):
+def command_kick(text, peer_id, group_id, from_id, chat_id):
     vk = vk_auth()
-    if len(text.lower().split()) > 1:
-        if text.lower().split()[1].split('/')[0] == 'https:' and \
-                text.lower().split()[1].split('/')[2] == 'vk.com':
-            users_list = vk.messages.getConversationMembers(peer_id=list['peer_id'], group_id=list['group_id'])
-            user_nick = text.lower().split()[1].split('/')[3]
+    split_text = text.lower().split()
+    if len(split_text) > 1:
+        if split_text[1].split('/')[0] == 'https:' and \
+                split_text[1].split('/')[2] == 'vk.com':
+            users_list = vk.messages.getConversationMembers(peer_id=peer_id, group_id=group_id)
+            user_nick = split_text[1].split('/')[3]
             user_id = vk.utils.resolveScreenName(screen_name=user_nick)['object_id']
             if user_in_list(users_list, user_id):
-                if can_kick(users_list, list['from_id'], user_id, list['chat_id']):
-                    vk.messages.removeChatUser(chat_id=list['chat_id'], member_id=user_id)
-                    is_kicked = True
-                    return is_kicked
+                if can_kick(users_list, from_id, user_id, chat_id):
+                    vk.messages.removeChatUser(chat_id=chat_id, member_id=user_id)
             else:
                 messages = 'Пользователь не участник беседы'
-                send_vk(messages, list['chat_id'])
+                send_vk(messages, chat_id)
         else:
             messages = 'Неверная ссылка. Повторите попытку'
-            send_vk(messages, list['chat_id'])
+            send_vk(messages, chat_id)
     else:
         messages = 'Вы не ввели ссылку. Повторите попытку'
-        send_vk(messages, list['chat_id'])
+        send_vk(messages, chat_id)
+
+
+def init_longpoll():
+    group_id = '197440489'
+    vk_session = vk_api.VkApi(token=token)
+    longpoll = VkBotLongPoll(vk_session, group_id)
+    return longpoll
 
 
 def main():
-    global data_list
-    is_kicked = None
-    group_id = '197440489'
-    vk_session = vk_api.VkApi(token=token)
-    vk = vk_session.get_api()
-    longpoll = VkBotLongPoll(vk_session, group_id)
+    vk = vk_auth()
+    longpoll = init_longpoll()
     print('Бот запущен')
-    users_finite = None
     for event in longpoll.listen():
-        try:
-            peer_id = 2000000000 + int(event.chat_id)
-            is_chat = True
-            data_list = {'group_id': '197440489', 'chat_id': event.chat_id, 'peer_id': peer_id, 'from_id': event.obj.from_id}
-        except:
-            user_id = event.obj.from_id
-            is_chat = False
-
         if event.type == VkBotEventType.MESSAGE_NEW and event.obj.text:
 
-            if is_chat:
-                start_time = time.time()
-                if event.obj.text.lower().split()[0] == '/помощь':
-                    command_help(data_list['chat_id'])
-                elif event.obj.text.lower().split()[0] == '/онлайн':
-                    command_online(data_list)
-                elif event.obj.text.lower().split()[0] == '/монетка':
-                    command_flip(data_list['chat_id'])
-                elif event.obj.text.lower().split()[0] == '/ролл':
-                    command_roll(event.obj.text, data_list['chat_id'])
-                elif event.obj.text.lower().split()[0] == '/кто':
-                    command_who(data_list)
-                elif event.obj.text.lower().split()[0] == '/шанс':
+            if event.from_chat:
+                peer_id = 2000000000 + int(event.chat_id)
+                group_id = '197440489'
+                chat_id = event.chat_id
+                from_id = event.obj.from_id
+                text = event.obj.text
+                split_text = event.obj.text.lower().split()[0]
+                if split_text == '/помощь':
+                    command_help(chat_id)
+                elif split_text == '/онлайн':
+                    command_online(peer_id, group_id, chat_id)
+                elif split_text == '/монетка':
+                    command_flip(chat_id)
+                elif split_text == '/ролл':
+                    command_roll(text, chat_id)
+                elif split_text == '/кто':
+                    command_who(peer_id, group_id, chat_id)
+                elif split_text == '/шанс':
                     messages = f'Вероятность - {randint(1, 100)}%'
-                    send_vk(messages, data_list['chat_id'])
-                elif event.obj.text.lower().split()[0] == '/кик':
-                    is_kicked = command_kick(event.obj.text, data_list)
+                    send_vk(messages, chat_id)
+                elif split_text == '/кик':
+                    command_kick(text, peer_id, group_id, from_id, chat_id)
             else:
+                user_id = event.obj.from_id
                 messages = 'Я работаю только в чатах'
                 vk = vk_auth()
-                vk.messages.send(user_id=user_id, message=messages, random_id=0, peer_id=user_id)
-
-        if event.obj.action and event.obj.action['type'] == 'chat_invite_user':
-            check_user(event.obj.action['member_id'],data_list['chat_id'])
-        elif event.obj.action and event.obj.action['type'] == 'chat_kick_user':
+                vk.messages.send(user_id=event.obj.from_id, message=messages, random_id=0, peer_id=user_id)
+        action = event.obj.action
+        if action and action['type'] == 'chat_invite_user':
+            check_user(action['member_id'], chat_id)
+        elif action and action['type'] == 'chat_kick_user':
             try:
-                vk.messages.removeChatUser(chat_id=data_list['chat_id'], member_id=event.obj.action['member_id'])
+                vk.messages.removeChatUser(chat_id=chat_id, member_id=action['member_id'])
             except:
                 pass
 
 
 if __name__ == '__main__':
     main()
-
